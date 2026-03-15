@@ -1,3 +1,16 @@
+import {
+    getDifficultyMultiplier,
+    getEnemyStats,
+    getPlayerBulletDamage,
+    getPlayerDamage,
+    getKillScore,
+    getNextUpgradeThreshold,
+    getDropProbability,
+    COMBO_TIMEOUT_MS,
+    BASE_SPAWN_RATE_MS,
+    MIN_SPAWN_RATE_MS,
+} from '../systems/BalanceEngine.js';
+
 export class Game {
     constructor(canvasElement, progressManager, audioManager) {
         this.canvas = canvasElement;
@@ -55,9 +68,15 @@ export class Game {
         this.lastTime = 0;
 
         this.lastEnemySpawnTime = 0;
-        this.enemySpawnRate = 1500;
+        this.enemySpawnRate = BASE_SPAWN_RATE_MS;
 
         this.bossSpawned = false;
+
+        // Combo & kill tracking (BalanceEngine)
+        this.combo = 0;
+        this.lastKillTime = 0;
+        this.killsSinceLastDrop = 0;
+        this.upgradeCount = 0;
 
         this.bindEvents();
     }
@@ -122,6 +141,10 @@ export class Game {
         this.enemies = [];
         this.gameTime = 0;
         this.bossSpawned = false;
+        this.combo = 0;
+        this.lastKillTime = 0;
+        this.killsSinceLastDrop = 0;
+        this.upgradeCount = 0;
 
         this.player.x = this.canvas.width / 2;
         this.player.y = this.canvas.height - 150;
@@ -210,9 +233,16 @@ export class Game {
     }
 
     update(timestamp) {
-        // Upgrade Check
-        if (this.score >= 1500 && this.score >= this.lastUpgradeScore + 1500) {
+        // Combo timeout reset
+        if (this.combo > 0 && timestamp - this.lastKillTime > COMBO_TIMEOUT_MS) {
+            this.combo = 0;
+        }
+
+        // Upgrade Check (BalanceEngine: exponential threshold scaling)
+        const upgradeThreshold = getNextUpgradeThreshold(this.lastUpgradeScore, this.upgradeCount);
+        if (this.score >= upgradeThreshold) {
             this.lastUpgradeScore = this.score;
+            this.upgradeCount++;
             this.isPaused = true;
             if (this.onUpgradeRequired) this.onUpgradeRequired();
             return;
@@ -240,7 +270,9 @@ export class Game {
         } else if (!this.bossSpawned && timestamp - this.lastEnemySpawnTime > this.enemySpawnRate) {
             this.spawnEnemy();
             this.lastEnemySpawnTime = timestamp;
-            if (this.enemySpawnRate > 500) this.enemySpawnRate -= 5;
+            // BalanceEngine: spawn rate shrinks proportionally with difficulty multiplier
+            const diff = getDifficultyMultiplier(this.gameTime);
+            this.enemySpawnRate = Math.max(MIN_SPAWN_RATE_MS, Math.round(BASE_SPAWN_RATE_MS / diff));
         }
 
         // Entity Updates
@@ -362,17 +394,19 @@ export class Game {
         else type = 'D';
 
         const x = Math.random() * (this.width - 60) + 30;
+        // Dynamic stats via BalanceEngine (difficulty scales with game time)
+        const stats = getEnemyStats(type, this.gameTime);
         let enemy = {
             type: type,
             x: x, y: -60,
             width: 50, height: 50,
-            hp: 20, speed: 3,
+            hp: stats.hp, speed: stats.speed,
             behavior: 'straight'
         };
 
-        if (type === 'B') { enemy.behavior = 'chase'; enemy.speed = 2; }
-        if (type === 'C') { enemy.width = 70; enemy.height = 70; enemy.hp = 60; enemy.speed = 4; }
-        if (type === 'D') { enemy.width = 80; enemy.height = 80; enemy.hp = 80; enemy.behavior = 'chase'; enemy.speed = 1.5; }
+        if (type === 'B') { enemy.behavior = 'chase'; }
+        if (type === 'C') { enemy.width = 70; enemy.height = 70; }
+        if (type === 'D') { enemy.width = 80; enemy.height = 80; enemy.behavior = 'chase'; }
 
         this.enemies.push(enemy);
     }
@@ -434,21 +468,32 @@ export class Game {
                 if (Math.abs(b.x - t.x) < (b.width + w) / 2 && Math.abs(b.y - t.y) < (b.height + (t.height || 30)) / 2) {
                     this.bullets.splice(i, 1);
                     if (b.isPlayer) {
-                        t.hp -= 20; // Player Damage
+                        // BalanceEngine: weapon-level-scaled damage with diminishing returns
+                        const dmg = getPlayerBulletDamage(this.player.weaponLevel);
+                        t.hp -= dmg;
                         if (t.hp <= 0) {
                             if (t.type === 'boss') {
-                                this.score += 5000;
+                                // BalanceEngine: combo scoring for boss kill
+                                this.score += getKillScore('boss', this.combo);
                                 if (this.onVictory) this.onVictory(this.score);
                                 this.isGameActive = false;
                             } else {
                                 this.enemies.splice(j, 1);
-                                this.score += 100;
+                                // BalanceEngine: combo scoring + variable ratio drop check
+                                this.combo++;
+                                this.lastKillTime = performance.now();
+                                this.score += getKillScore(t.type, this.combo);
+                                this.killsSinceLastDrop++;
+                                if (Math.random() < getDropProbability(this.killsSinceLastDrop)) {
+                                    this.killsSinceLastDrop = 0;
+                                    // Item drop hook (extend here for future power-up spawning)
+                                }
                             }
                             this.updateHUD();
                         }
                     } else {
-                        // Player hit
-                        this.player.hp -= 10;
+                        // Player hit — BalanceEngine: damage scales with current difficulty
+                        this.player.hp -= getPlayerDamage(this.gameTime);
                         this.updateHUD();
                         if (this.player.hp <= 0) {
                             this.isGameActive = false;
