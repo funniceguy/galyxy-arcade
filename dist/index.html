@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Galyxy Arcade War</title>
+  <script type="module" crossorigin src="/assets/index-BBhJD0Xh.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-tdMeIxdt.css">
+</head>
+
+<body>
+    <div id="app">
+        <canvas id="world"></canvas>
+        <div id="ui-layer">
+            <!-- Lobby Screen (First Screen) -->
+            <div id="screen-lobby" class="screen">
+                <div class="panel">
+                    <h1>GALAXY ARCADE WAR</h1>
+                    <p class="mission-briefing">Mission: Defend the sector. Survive.</p>
+                    <button id="btn-play" class="btn-primary">DEPLOY SHIP</button>
+                    <div class="controls-hint">Drag to Move | Auto-Fire Engaged</div>
+                </div>
+            </div>
+
+            <!-- Game Screen -->
+            <div id="screen-game" class="screen" style="display: none;">
+                <div id="hud-top">
+                    <!-- HP Bar -->
+                    <div id="hp-container">
+                        <div id="hp-label">HULL</div>
+                        <div id="hp-bar-bg">
+                            <div id="hp-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div id="score-board">SCORE: <span id="score-val">0</span></div>
+                </div>
+            </div>
+
+            <!-- Game Over Screen -->
+            <div id="screen-gameover" class="screen" style="display: none;">
+                <div class="panel">
+                    <h2 class="danger-text">CRITICAL FAILURE</h2>
+                    <p>Ship Destroyed</p>
+                    <div id="final-score">Final Score: 0</div>
+                    <button id="btn-lobby" class="btn-primary">RETURN TO BASE</button>
+                </div>
+            </div>
+
+            <!-- Upgrade Screen -->
+            <div id="screen-upgrade" class="screen" style="display: none;">
+                <h1>System Upgrade</h1>
+                <p class="mission-briefing">Select a module to enhance ship capabilities.</p>
+                <div id="upgrade-cards-container"></div>
+            </div>
+
+            <!-- Clear Screen -->
+            <div id="screen-clear" class="screen" style="display: none;">
+                <div class="panel">
+                    <h2 style="color: #2ecc71;">MISSION ACCOMPLISHED</h2>
+                    <p>Sector Secure.</p>
+                    <div id="clear-score">Final Score: 0</div>
+                    <button id="btn-clear-lobby" class="btn-primary">RETURN TO BASE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="src/libs/matter.min.js"></script>
+</body>
+
+</html>
